@@ -1,36 +1,10 @@
 {
-  "name": "mi-web-investigaciones",
-  "version": "0.1.0",
+  "name": "sistema-investigaciones",
+  "version": "1.0.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+  "engines": {
+    "node": "18.x"
   },
-  "dependencies": {
-    "axios": "^1.13.2",
-    "bcryptjs": "^3.0.3",
-    "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2",
-    "next": "16.0.1",
-    "pg": "^8.16.3",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "sqlite3": "^5.1.7"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.0.1",
-    "tailwindcss": "^4",
-    "typescript": "^5"
-  }
-}
-{
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -38,10 +12,15 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "13.x",
-    "react": "18.x",
-    "react-dom": "18.x",
+    "next": "13.4.19",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
     "pg": "^8.11.3",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "sqlite3": "^5.1.6"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-next": "13.4.19"
   }
 }

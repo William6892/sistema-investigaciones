@@ -3,11 +3,6 @@ const nextConfig = {
   output: 'standalone',
   experimental: {
     appDir: false
-  },
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb'
-    }
   }
 }
 

@@ -1,4 +1,3 @@
-// scripts/init-neon.js
 const { Pool } = require('pg');
 
 async function initDatabase() {
@@ -20,7 +19,7 @@ async function initDatabase() {
         fecha_creacion TIMESTAMP DEFAULT NOW()
       )
     `);
-    console.log('✅ Tabla "investigaciones" creada');
+    console.log('✅ Tabla investigaciones creada');
 
     // Tabla comentarios
     await pool.query(`
@@ -31,7 +30,7 @@ async function initDatabase() {
         fecha_creacion TIMESTAMP DEFAULT NOW()
       )
     `);
-    console.log('✅ Tabla "comentarios" creada');
+    console.log('✅ Tabla comentarios creada');
 
     // Tabla archivos
     await pool.query(`
@@ -45,21 +44,21 @@ async function initDatabase() {
         fecha_creacion TIMESTAMP DEFAULT NOW()
       )
     `);
-    console.log('✅ Tabla "archivos" creada');
+    console.log('✅ Tabla archivos creada');
 
-    // Verificar si hay datos
-    const result = await pool.query('SELECT COUNT(*) FROM investigaciones');
+    // Datos de ejemplo
+    const result = await pool.query('SELECT COUNT(*) as count FROM investigaciones');
     if (parseInt(result.rows[0].count) === 0) {
       await pool.query(`
         INSERT INTO investigaciones (titulo, descripcion, estado) 
-        VALUES ('Investigación de Ejemplo', 'Sistema funcionando con Neon PostgreSQL', 'abierto')
+        VALUES ('Investigación de Ejemplo', 'Sistema funcionando con PostgreSQL', 'abierto')
       `);
       console.log('✅ Datos de ejemplo insertados');
     }
 
-    console.log('🎉 Base de datos Neon configurada correctamente');
+    console.log('🎉 Base de datos configurada correctamente');
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ Error:', error.message);
   } finally {
     await pool.end();
   }

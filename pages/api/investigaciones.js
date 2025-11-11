@@ -2,6 +2,17 @@
 const { dbAll, dbRun, dbGet } = require('../../lib/database');
 
 export default async function handler(req, res) {
+  // 🔥 CORS HEADERS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  const { id } = req.query;
+
   try {
     if (req.method === 'GET') {
       // Obtener todas las investigaciones
@@ -24,35 +35,27 @@ export default async function handler(req, res) {
       const { titulo, descripcion } = req.body;
       
       const result = await dbRun(
-        'INSERT INTO investigaciones (titulo, descripcion) VALUES (?, ?)',
+        'INSERT INTO investigaciones (titulo, descripcion) VALUES ($1, $2)',
         [titulo, descripcion]
       );
       
       // Obtener la investigación creada
       const investigacionCreada = await dbGet(
-        'SELECT * FROM investigaciones WHERE id = ?',
+        'SELECT * FROM investigaciones WHERE id = $1',
         [result.lastID]
       );
       
-      res.json({ 
-        id: result.lastID, 
-        titulo, 
-        descripcion, 
-        estado: 'abierto',
-        ...investigacionCreada
-      });
+      res.json(investigacionCreada);
     }
 
     else if (req.method === 'PUT') {
-      const { id } = req.query;
-      
-      // Si viene en el query, es para editar título/descripción
+      // Si viene id en query, es para editar título/descripción
       if (id) {
         const { titulo, descripcion } = req.body;
         
         // Verificar que la investigación no esté cerrada
         const investigacion = await dbGet(
-          'SELECT estado FROM investigaciones WHERE id = ?', 
+          'SELECT estado FROM investigaciones WHERE id = $1', 
           [id]
         );
         
@@ -66,29 +69,23 @@ export default async function handler(req, res) {
         
         // Actualizar título y descripción
         await dbRun(
-          'UPDATE investigaciones SET titulo = ?, descripcion = ? WHERE id = ?',
+          'UPDATE investigaciones SET titulo = $1, descripcion = $2 WHERE id = $3',
           [titulo, descripcion, id]
         );
         
         // Obtener la investigación actualizada
         const investigacionActualizada = await dbGet(
-          'SELECT * FROM investigaciones WHERE id = ?',
+          'SELECT * FROM investigaciones WHERE id = $1',
           [id]
         );
         
-        res.json({ 
-          message: 'Investigación actualizada', 
-          id, 
-          titulo, 
-          descripcion,
-          ...investigacionActualizada
-        });
+        res.json(investigacionActualizada);
       } 
-      // Si no viene id en query, es para cambiar estado (mantener compatibilidad)
+      // Si no viene id en query, es para cambiar estado
       else {
         const { id, estado } = req.body;
         await dbRun(
-          'UPDATE investigaciones SET estado = ? WHERE id = ?',
+          'UPDATE investigaciones SET estado = $1 WHERE id = $2',
           [estado, id]
         );
         

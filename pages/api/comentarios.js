@@ -1,12 +1,11 @@
 const { dbAll, dbRun, dbGet } = require('../../lib/database');
 
 export default async function handler(req, res) {
-  // 🔥 AGREGAR ESTOS CORS HEADERS
+  // 🔥 CORS HEADERS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Manejar preflight request
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -18,13 +17,13 @@ export default async function handler(req, res) {
       const { investigacion_id, contenido } = req.body;
       
       const result = await dbRun(
-        'INSERT INTO comentarios (investigacion_id, contenido) VALUES (?, ?)',
+        'INSERT INTO comentarios (investigacion_id, contenido) VALUES ($1, $2)',
         [investigacion_id, contenido]
       );
       
       // Obtener el comentario creado
       const comentarioCreado = await dbGet(
-        'SELECT * FROM comentarios WHERE id = ?',
+        'SELECT * FROM comentarios WHERE id = $1',
         [result.lastID]
       );
       
@@ -33,7 +32,7 @@ export default async function handler(req, res) {
 
     else if (req.method === 'GET') {
       const comentarios = await dbAll(
-        'SELECT * FROM comentarios WHERE investigacion_id = ? ORDER BY fecha_creacion DESC',
+        'SELECT * FROM comentarios WHERE investigacion_id = $1 ORDER BY fecha_creacion DESC',
         [investigacion_id]
       );
       
@@ -41,7 +40,7 @@ export default async function handler(req, res) {
     }
 
     else if (req.method === 'DELETE') {
-      await dbRun('DELETE FROM comentarios WHERE id = ?', [id]);
+      await dbRun('DELETE FROM comentarios WHERE id = $1', [id]);
       res.json({ message: 'Comentario eliminado', id });
     }
 
@@ -49,13 +48,13 @@ export default async function handler(req, res) {
       const { contenido } = req.body;
       
       await dbRun(
-        'UPDATE comentarios SET contenido = ? WHERE id = ?',
+        'UPDATE comentarios SET contenido = $1 WHERE id = $2',
         [contenido, id]
       );
       
       // Obtener el comentario actualizado
       const comentarioActualizado = await dbGet(
-        'SELECT * FROM comentarios WHERE id = ?',
+        'SELECT * FROM comentarios WHERE id = $1',
         [id]
       );
       

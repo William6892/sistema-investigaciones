@@ -1,7 +1,7 @@
 const { dbAll, dbRun, dbGet } = require('../../lib/database');
 
 export default async function handler(req, res) {
-  // CORS headers
+  // 🔥 CORS HEADERS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
         console.log('📥 Solicitando descarga del archivo ID:', id);
         
         const archivo = await dbGet(
-          'SELECT * FROM archivos WHERE id = ?',
+          'SELECT * FROM archivos WHERE id = $1',
           [id]
         );
         
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
       }
 
       const archivos = await dbAll(
-        'SELECT id, investigacion_id, nombre_archivo, tipo_archivo, tamano, fecha_creacion FROM archivos WHERE investigacion_id = ? ORDER BY fecha_creacion DESC',
+        'SELECT id, investigacion_id, nombre_archivo, tipo_archivo, tamano, fecha_creacion FROM archivos WHERE investigacion_id = $1 ORDER BY fecha_creacion DESC',
         [investigacion_id]
       );
       
@@ -83,13 +83,13 @@ export default async function handler(req, res) {
       // Guardar en la base de datos
       const result = await dbRun(
         `INSERT INTO archivos (investigacion_id, nombre_archivo, tipo_archivo, contenido_base64, tamano) 
-         VALUES (?, ?, ?, ?, ?)`,
+         VALUES ($1, $2, $3, $4, $5)`,
         [investigacion_id, nombre_archivo, tipo_archivo, contenido_base64, tamano]
       );
       
       // Obtener el archivo insertado
       const archivoInsertado = await dbGet(
-        'SELECT id, investigacion_id, nombre_archivo, tipo_archivo, tamano, fecha_creacion FROM archivos WHERE id = ?',
+        'SELECT id, investigacion_id, nombre_archivo, tipo_archivo, tamano, fecha_creacion FROM archivos WHERE id = $1',
         [result.lastID]
       );
       
@@ -103,7 +103,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Falta ID del archivo' });
       }
 
-      await dbRun('DELETE FROM archivos WHERE id = ?', [id]);
+      await dbRun('DELETE FROM archivos WHERE id = $1', [id]);
       console.log('🗑️ Archivo eliminado:', id);
       
       res.json({ message: 'Archivo eliminado', id });
@@ -115,14 +115,6 @@ export default async function handler(req, res) {
     
   } catch (error) {
     console.error('💥 Error en API archivos:', error);
-    
-    // Manejar errores específicos de SQLite
-    if (error.message && error.message.includes('too large')) {
-      res.status(413).json({ error: 'Archivo demasiado grande para la base de datos' });
-    } else if (error.message && error.message.includes('SQLITE_TOOBIG')) {
-      res.status(413).json({ error: 'El archivo excede el límite de SQLite' });
-    } else {
-      res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
-    }
+    res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
   }
 }

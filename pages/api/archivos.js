@@ -1,103 +1,128 @@
-const db = require('../../lib/database');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { dbAll, dbRun, dbGet } = require('../../lib/database');
 
-// Configurar multer para subida de archivos
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname);
-    cb(null, uniqueName);
+export default async function handler(req, res) {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
-});
 
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }
-});
+  const { id, investigacion_id } = req.query;
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+  console.log('🔍 API Archivos - Método:', req.method, 'Query:', req.query);
 
-export default function handler(req, res) {
-  if (req.method === 'POST') {
-    upload.single('archivo')(req, res, function (err) {
-      if (err) {
-        return res.status(500).json({ error: 'Error subiendo archivo: ' + err.message });
-      }
-
-      const { investigacion_id } = req.body;
-      const archivo = req.file;
-
-      if (!archivo) {
-        return res.status(400).json({ error: 'No se subió ningún archivo' });
-      }
-
-      db.run(
-        'INSERT INTO archivos (investigacion_id, nombre_archivo, ruta) VALUES (?, ?, ?)',
-        [investigacion_id, archivo.originalname, `/uploads/${archivo.filename}`],
-        function(err) {
-          if (err) {
-            return res.status(500).json({ error: err.message });
-          }
-          res.json({ 
-            id: this.lastID, 
-            investigacion_id, 
-            nombre_archivo: archivo.originalname,
-            ruta: `/uploads/${archivo.filename}`,
-            fecha_creacion: new Date().toISOString()
-          });
+  try {
+    if (req.method === 'GET') {
+      // ✅ ENDPOINT DE DESCARGA INDIVIDUAL
+      if (id) {
+        console.log('📥 Solicitando descarga del archivo ID:', id);
+        
+        const archivo = await dbGet(
+          'SELECT * FROM archivos WHERE id = ?',
+          [id]
+        );
+        
+        if (!archivo) {
+          return res.status(404).json({ error: 'Archivo no encontrado' });
         }
+        
+        if (!archivo.contenido_base64) {
+          return res.status(404).json({ error: 'Contenido del archivo no disponible' });
+        }
+        
+        // Extraer el base64 puro (sin el prefijo data:...)
+        const base64Data = archivo.contenido_base64.replace(/^data:[^;]+;base64,/, '');
+        const fileBuffer = Buffer.from(base64Data, 'base64');
+        
+        // Configurar headers para descarga
+        res.setHeader('Content-Type', archivo.tipo_archivo);
+        res.setHeader('Content-Disposition', `attachment; filename="${archivo.nombre_archivo}"`);
+        res.setHeader('Content-Length', fileBuffer.length);
+        
+        console.log('✅ Enviando archivo para descarga:', archivo.nombre_archivo);
+        return res.send(fileBuffer);
+      }
+      
+      // ✅ ENDPOINT DE LISTADO (sin contenido_base64)
+      if (!investigacion_id) {
+        return res.status(400).json({ error: 'Falta investigacion_id' });
+      }
+
+      const archivos = await dbAll(
+        'SELECT id, investigacion_id, nombre_archivo, tipo_archivo, tamano, fecha_creacion FROM archivos WHERE investigacion_id = ? ORDER BY fecha_creacion DESC',
+        [investigacion_id]
       );
-    });
-  }
+      
+      console.log('✅ Archivos encontrados:', archivos.length);
+      res.json(archivos);
+    }
 
-  if (req.method === 'GET') {
-    const { investigacion_id } = req.query;
-    
-    db.all(
-      'SELECT * FROM archivos WHERE investigacion_id = ? ORDER BY fecha_creacion DESC',
-      [investigacion_id],
-      (err, rows) => {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        res.json(rows);
-      }
-    );
-  }
-
-  if (req.method === 'DELETE') {
-    const { id } = req.query;
-    
-    db.get('SELECT * FROM archivos WHERE id = ?', [id], (err, archivo) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-
-      if (archivo && archivo.ruta) {
-        const filePath = path.join(process.cwd(), 'public', archivo.ruta);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      }
-
-      db.run('DELETE FROM archivos WHERE id = ?', [id], function(err) {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        res.json({ message: 'Archivo eliminado', id });
+    else if (req.method === 'POST') {
+      const { investigacion_id, nombre_archivo, contenido_base64, tipo_archivo, tamano } = req.body;
+      
+      console.log('💾 Guardando archivo:', {
+        nombre: nombre_archivo,
+        tipo: tipo_archivo,
+        tamaño: tamano,
+        tamaño_base64: contenido_base64?.length || 0
       });
-    });
+
+      // Validaciones
+      if (!investigacion_id || !nombre_archivo || !contenido_base64) {
+        return res.status(400).json({ error: 'Faltan campos requeridos' });
+      }
+
+      // Verificar tamaño del base64 (5MB + overhead)
+      if (contenido_base64.length > 7 * 1024 * 1024) {
+        return res.status(413).json({ error: 'Archivo demasiado grande después de codificación' });
+      }
+
+      // Guardar en la base de datos
+      const result = await dbRun(
+        `INSERT INTO archivos (investigacion_id, nombre_archivo, tipo_archivo, contenido_base64, tamano) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [investigacion_id, nombre_archivo, tipo_archivo, contenido_base64, tamano]
+      );
+      
+      // Obtener el archivo insertado
+      const archivoInsertado = await dbGet(
+        'SELECT id, investigacion_id, nombre_archivo, tipo_archivo, tamano, fecha_creacion FROM archivos WHERE id = ?',
+        [result.lastID]
+      );
+      
+      console.log('✅ Archivo guardado con ID:', result.lastID);
+      
+      res.status(201).json(archivoInsertado);
+    }
+
+    else if (req.method === 'DELETE') {
+      if (!id) {
+        return res.status(400).json({ error: 'Falta ID del archivo' });
+      }
+
+      await dbRun('DELETE FROM archivos WHERE id = ?', [id]);
+      console.log('🗑️ Archivo eliminado:', id);
+      
+      res.json({ message: 'Archivo eliminado', id });
+    }
+
+    else {
+      res.status(405).json({ error: 'Método no permitido' });
+    }
+    
+  } catch (error) {
+    console.error('💥 Error en API archivos:', error);
+    
+    // Manejar errores específicos de SQLite
+    if (error.message && error.message.includes('too large')) {
+      res.status(413).json({ error: 'Archivo demasiado grande para la base de datos' });
+    } else if (error.message && error.message.includes('SQLITE_TOOBIG')) {
+      res.status(413).json({ error: 'El archivo excede el límite de SQLite' });
+    } else {
+      res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
+    }
   }
 }

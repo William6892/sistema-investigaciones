@@ -1,71 +1,73 @@
-const db = require('../../lib/database');
+const { dbAll, dbRun, dbGet } = require('../../lib/database');
 
-export default function handler(req, res) {
-  if (req.method === 'POST') {
-    const { investigacion_id, contenido } = req.body;
-    
-    db.run(
-      'INSERT INTO comentarios (investigacion_id, contenido) VALUES (?, ?)',
-      [investigacion_id, contenido],
-      function(err) {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        res.json({ 
-          id: this.lastID, 
-          investigacion_id, 
-          contenido,
-          fecha_creacion: new Date().toISOString()
-        });
-      }
-    );
+export default async function handler(req, res) {
+  // 🔥 AGREGAR ESTOS CORS HEADERS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Manejar preflight request
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
 
-  if (req.method === 'GET') {
-    const { investigacion_id } = req.query;
-    
-    db.all(
-      'SELECT * FROM comentarios WHERE investigacion_id = ? ORDER BY fecha_creacion DESC',
-      [investigacion_id],
-      (err, rows) => {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        res.json(rows);
-      }
-    );
-  }
+  const { id, investigacion_id } = req.query;
 
-  // NUEVO: Método para eliminar comentario
-  if (req.method === 'DELETE') {
-    const { id } = req.query;
-    
-    db.run(
-      'DELETE FROM comentarios WHERE id = ?',
-      [id],
-      function(err) {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        res.json({ message: 'Comentario eliminado', id });
-      }
-    );
-  }
+  try {
+    if (req.method === 'POST') {
+      const { investigacion_id, contenido } = req.body;
+      
+      const result = await dbRun(
+        'INSERT INTO comentarios (investigacion_id, contenido) VALUES (?, ?)',
+        [investigacion_id, contenido]
+      );
+      
+      // Obtener el comentario creado
+      const comentarioCreado = await dbGet(
+        'SELECT * FROM comentarios WHERE id = ?',
+        [result.lastID]
+      );
+      
+      res.json(comentarioCreado);
+    }
 
-  // NUEVO: Método para editar comentario
-  if (req.method === 'PUT') {
-    const { id } = req.query;
-    const { contenido } = req.body;
+    else if (req.method === 'GET') {
+      const comentarios = await dbAll(
+        'SELECT * FROM comentarios WHERE investigacion_id = ? ORDER BY fecha_creacion DESC',
+        [investigacion_id]
+      );
+      
+      res.json(comentarios);
+    }
+
+    else if (req.method === 'DELETE') {
+      await dbRun('DELETE FROM comentarios WHERE id = ?', [id]);
+      res.json({ message: 'Comentario eliminado', id });
+    }
+
+    else if (req.method === 'PUT') {
+      const { contenido } = req.body;
+      
+      await dbRun(
+        'UPDATE comentarios SET contenido = ? WHERE id = ?',
+        [contenido, id]
+      );
+      
+      // Obtener el comentario actualizado
+      const comentarioActualizado = await dbGet(
+        'SELECT * FROM comentarios WHERE id = ?',
+        [id]
+      );
+      
+      res.json(comentarioActualizado);
+    }
+
+    else {
+      res.status(405).json({ error: 'Método no permitido' });
+    }
     
-    db.run(
-      'UPDATE comentarios SET contenido = ? WHERE id = ?',
-      [contenido, id],
-      function(err) {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        res.json({ message: 'Comentario actualizado', id, contenido });
-      }
-    );
+  } catch (error) {
+    console.error('Error en API comentarios:', error);
+    res.status(500).json({ error: error.message });
   }
 }

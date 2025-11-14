@@ -25,25 +25,39 @@ export default async function handler(req, res) {
           [id]
         );
         
+        console.log('📄 Archivo encontrado:', archivo ? 'SÍ' : 'NO');
+        
         if (!archivo) {
           return res.status(404).json({ error: 'Archivo no encontrado' });
         }
         
         if (!archivo.contenido_base64) {
+          console.log('❌ Archivo sin contenido_base64');
           return res.status(404).json({ error: 'Contenido del archivo no disponible' });
         }
+
+        console.log('📊 Tipo archivo:', archivo.tipo_archivo);
+        console.log('📏 Tamaño base64:', archivo.contenido_base64.length);
         
-        // Extraer el base64 puro (sin el prefijo data:...)
-        const base64Data = archivo.contenido_base64.replace(/^data:[^;]+;base64,/, '');
-        const fileBuffer = Buffer.from(base64Data, 'base64');
-        
-        // Configurar headers para descarga
-        res.setHeader('Content-Type', archivo.tipo_archivo);
-        res.setHeader('Content-Disposition', `attachment; filename="${archivo.nombre_archivo}"`);
-        res.setHeader('Content-Length', fileBuffer.length);
-        
-        console.log('✅ Enviando archivo para descarga:', archivo.nombre_archivo);
-        return res.send(fileBuffer);
+        try {
+          // Extraer el base64 puro (sin el prefijo data:...)
+          const base64Data = archivo.contenido_base64.replace(/^data:[^;]+;base64,/, '');
+          console.log('📏 Base64 limpio tamaño:', base64Data.length);
+          
+          const fileBuffer = Buffer.from(base64Data, 'base64');
+          console.log('📏 Buffer tamaño:', fileBuffer.length);
+          
+          // Configurar headers para descarga
+          res.setHeader('Content-Type', archivo.tipo_archivo);
+          res.setHeader('Content-Disposition', `attachment; filename="${archivo.nombre_archivo}"`);
+          res.setHeader('Content-Length', fileBuffer.length);
+          
+          console.log('✅ Enviando archivo para descarga:', archivo.nombre_archivo);
+          return res.send(fileBuffer);
+        } catch (bufferError) {
+          console.error('💥 Error creando buffer:', bufferError);
+          return res.status(500).json({ error: 'Error procesando archivo: ' + bufferError.message });
+        }
       }
       
       // ✅ ENDPOINT DE LISTADO (sin contenido_base64)
@@ -110,6 +124,7 @@ export default async function handler(req, res) {
     
   } catch (error) {
     console.error('💥 Error en API archivos:', error);
+    console.error('💥 Stack trace:', error.stack);
     res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
   }
 }

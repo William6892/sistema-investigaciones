@@ -80,20 +80,15 @@ export default async function handler(req, res) {
         return res.status(413).json({ error: 'Archivo demasiado grande después de codificación' });
       }
 
-      // Guardar en la base de datos
-      const result = await dbRun(
+      // ✅ CORREGIDO: Usar RETURNING para obtener el registro insertado
+      const archivoInsertado = await dbGet(
         `INSERT INTO archivos (investigacion_id, nombre_archivo, tipo_archivo, contenido_base64, tamano) 
-         VALUES ($1, $2, $3, $4, $5)`,
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, investigacion_id, nombre_archivo, tipo_archivo, tamano, fecha_creacion`,
         [investigacion_id, nombre_archivo, tipo_archivo, contenido_base64, tamano]
       );
       
-      // Obtener el archivo insertado
-      const archivoInsertado = await dbGet(
-        'SELECT id, investigacion_id, nombre_archivo, tipo_archivo, tamano, fecha_creacion FROM archivos WHERE id = $1',
-        [result.lastID]
-      );
-      
-      console.log('✅ Archivo guardado con ID:', result.lastID);
+      console.log('✅ Archivo guardado con ID:', archivoInsertado.id);
       
       res.status(201).json(archivoInsertado);
     }

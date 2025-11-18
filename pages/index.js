@@ -69,7 +69,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       <Head>
         <title>Sistema de Investigaciones</title>
-        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
       </Head>
 
       {/* Modal de Edición */}
